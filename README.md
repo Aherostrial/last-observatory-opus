@@ -6,9 +6,11 @@ at the accretion disk.
 
 ![Final still](renders/the_last_observatory_still.png)
 
-* **Final still:** `renders/the_last_observatory_still.png` (2560×1440)
-* **Animation:** `renders/the_last_observatory.mp4` (6 s, 24 fps, 1280×720, H.264).
+* **Website:** <https://aherostrial.github.io/last-observatory-opus/> (served by GitHub Pages from `index.html`)
+* **Final still:** `renders/the_last_observatory_still.png` (2560×1440, 384 spp; 516 s on a 4-core CPU)
+* **Animation:** `renders/the_last_observatory.mp4` (6 s, 24 fps, 1280×720, H.264, with a VP9 `.webm` fallback).
   It starts close on the astronaut's helmet and pulls back to reveal the whole planet.
+  The 144 frames took 7025 s, about 49 s per frame at 32 spp.
 * **Scene:** `the_last_observatory.blend` (Blender 5.2, Cycles + OSL)
 
 Everything is generated from Python (`scripts/`). There are no downloaded
@@ -78,6 +80,7 @@ open the file. **Rendering requires Cycles with Open Shading Language enabled
 ## Layout
 
 ```
+index.html                   GitHub Pages site (uses renders/)
 shaders/black_hole_sky.osl   lensing sky shader
 scripts/build_scene.py       builds + saves the scene
 scripts/render_still.py      hero still
