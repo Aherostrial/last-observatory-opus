@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Last Observatory</title>
+<meta name="description" content="A tiny observatory on an impossibly small planet, orbiting close to a black hole. A procedural Blender scene with a physically lensed accretion disk.">
+<meta property="og:title" content="The Last Observatory">
+<meta property="og:description" content="A tiny observatory on an impossibly small planet, orbiting close to a black hole.">
+<meta property="og:image" content="renders/the_last_observatory_still.jpg">
+<meta name="theme-color" content="#06070b">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%2306070b'/%3E%3Cellipse cx='32' cy='34' rx='28' ry='8' fill='none' stroke='%23f2a35e' stroke-width='4'/%3E%3Ccircle cx='32' cy='30' r='12' fill='%23000' stroke='%23ffd2a0' stroke-width='3'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #06070b;
+    --bg-raise: #0d0f16;
+    --line: #1c2030;
+    --text: #e8e3d9;
+    --muted: #9a9fb0;
+    --amber: #f2a35e;
+    --ember: #d9642b;
+    --cool: #8fa8d8;
+    --maxw: 1180px;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--bg); }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 400 17px/1.65 Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--amber); text-underline-offset: 3px; }
+  a:hover { color: #ffc58e; }
+  img, video { display: block; max-width: 100%; height: auto; }
+
+  /* ---------- hero: full still, copy beneath it ---------- */
+  .hero { position: relative; }
+  .hero-media {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    max-height: 88svh;
+    overflow: hidden;
+  }
+  .hero-media .poster {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    object-position: 50% 45%;
+  }
+  .hero-media::after {
+    content: "";
+    position: absolute; inset: 0;
+    background: linear-gradient(to top, var(--bg) 0%, rgba(6,7,11,.4) 9%, rgba(6,7,11,0) 22%);
+  }
+  .hero-inner {
+    width: 100%;
+    max-width: var(--maxw);
+    margin: 0 auto;
+    padding: clamp(8px, 2vw, 24px) 24px 0;
+  }
+  .hero-copy {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    gap: 16px clamp(28px, 5vw, 72px);
+    align-items: end;
+  }
+  .hero-copy .eyebrow { grid-column: 1 / -1; }
+  .hero-copy h1 { margin: 0; }
+  .hero-copy .blurb .lede { margin-top: 0; }
+  .eyebrow {
+    font: 600 12px/1 Inter, sans-serif;
+    letter-spacing: .22em;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin: 0 0 18px;
+  }
+  h1 {
+    font: 500 clamp(44px, 8.2vw, 104px)/.95 "Cormorant Garamond", Georgia, serif;
+    letter-spacing: -.01em;
+    margin: 0 0 18px;
+    text-wrap: balance;
+  }
+  .lede {
+    max-width: 34em;
+    font-size: clamp(16px, 1.6vw, 19px);
+    color: #d5d0c6;
+    margin: 0 0 26px;
+  }
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    white-space: nowrap;
+    padding: 11px 18px;
+    border-radius: 999px;
+    border: 1px solid rgba(242,163,94,.55);
+    background: rgba(242,163,94,.12);
+    color: var(--text);
+    font: 500 14px/1 Inter, sans-serif;
+    text-decoration: none;
+    backdrop-filter: blur(6px);
+  }
+  .btn:hover { background: rgba(242,163,94,.24); color: var(--text); }
+  .btn.ghost { border-color: rgba(232,227,217,.28); background: rgba(232,227,217,.06); }
+  .btn svg { width: 16px; height: 16px; }
+
+  /* ---------- sections ---------- */
+  section { max-width: var(--maxw); margin: 0 auto; padding: clamp(56px, 8vw, 104px) 24px 0; }
+  h2 {
+    font: 500 clamp(32px, 4.4vw, 52px)/1.05 "Cormorant Garamond", Georgia, serif;
+    margin: 0 0 14px;
+  }
+  .kicker { color: var(--muted); max-width: 40em; margin: 0 0 32px; }
+
+  figure { margin: 0; }
+  .frame {
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    background: var(--bg-raise);
+  }
+  figcaption { color: var(--muted); font-size: 14px; margin-top: 12px; }
+
+  .film video { width: 100%; aspect-ratio: 16 / 9; background: #000; }
+
+  .strip {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+    margin-top: 18px;
+  }
+  .strip figure { position: relative; }
+  .strip img { border-radius: 8px; border: 1px solid var(--line); aspect-ratio: 16 / 9; object-fit: cover; width: 100%; }
+  .strip span {
+    position: absolute; left: 8px; bottom: 6px;
+    font: 500 11px/1 Inter, sans-serif; letter-spacing: .08em;
+    color: #fff; text-shadow: 0 1px 3px #000;
+  }
+
+  /* ---------- notes grid ---------- */
+  .notes {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 18px;
+  }
+  .note {
+    background: var(--bg-raise);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 24px 24px 22px;
+  }
+  .note h3 {
+    margin: 0 0 10px;
+    font: 600 15px/1.3 Inter, sans-serif;
+    letter-spacing: .02em;
+  }
+  .note h3 i { font-style: normal; color: var(--amber); margin-right: 8px; }
+  .note p { margin: 0; color: #c3c0b8; font-size: 15.5px; }
+
+  .physics {
+    display: grid;
+    grid-template-columns: 1.15fr 1fr;
+    gap: clamp(20px, 4vw, 48px);
+    align-items: center;
+  }
+  .physics ul { margin: 0; padding: 0; list-style: none; }
+  .physics li { padding: 12px 0; border-top: 1px solid var(--line); color: #c9c5bc; font-size: 15.5px; }
+  .physics li:first-child { border-top: 0; padding-top: 0; }
+  .physics li b { color: var(--text); font-weight: 600; }
+  code, pre { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  code { font-size: .88em; background: #141826; padding: 2px 6px; border-radius: 5px; color: #f3d2b0; }
+
+  pre {
+    background: var(--bg-raise);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 18px 20px;
+    overflow-x: auto;
+    font-size: 13.5px;
+    line-height: 1.6;
+    color: #d8d4ca;
+  }
+  pre .c { color: #6f7589; }
+
+  footer {
+    max-width: var(--maxw);
+    margin: clamp(64px, 9vw, 120px) auto 0;
+    padding: 28px 24px 48px;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 14px;
+    display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between;
+  }
+
+  @media (max-width: 820px) {
+    .physics { grid-template-columns: 1fr; }
+    .strip { grid-template-columns: repeat(3, 1fr); }
+    .hero-media { aspect-ratio: 4 / 5; max-height: none; }
+    .hero-media .poster { object-position: 40% 50%; }
+    .hero-media::after { background: linear-gradient(to top, var(--bg) 0%, rgba(6,7,11,0) 30%); }
+    .hero-inner { margin-top: -28px; position: relative; }
+    .hero-copy { display: block; }
+    .hero-copy h1 { margin-bottom: 18px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="hero-media">
+    <img class="poster" src="renders/the_last_observatory_still.jpg" width="2560" height="1440" fetchpriority="high"
+         alt="A small cratered planet with a domed observatory and a lone astronaut beneath a vast black hole with a glowing, lensed accretion disk">
+  </div>
+  <div class="hero-inner"><div class="hero-copy">
+    <p class="eyebrow">A Blender scene &middot; Cycles + OSL</p>
+    <h1>The Last<br>Observatory</h1>
+    <div class="blurb">
+    <p class="lede">A tiny scientific outpost on an impossibly small planet, orbiting close to a black hole.
+      One astronaut stands at the edge of the world and watches the light fall in.</p>
+    <div class="actions">
+      <a class="btn" href="#film">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4 2.5v11l9-5.5z"/></svg>
+        Watch the film
+      </a>
+      <a class="btn ghost" href="renders/the_last_observatory_still.png">Full-resolution still</a>
+      <a class="btn ghost" href="https://github.com/Aherostrial/last-observatory-opus">Source on GitHub</a>
+    </div>
+    </div>
+  </div></div>
+</header>
+
+<main>
+
+<section id="film">
+  <h2>Six seconds</h2>
+  <p class="kicker">The camera starts over the astronaut's shoulder and pulls back in log space, so the frame widens at a steady rate.
+    As it retreats it rolls from the astronaut's local vertical to world up, and the horizon tilts away until the planet is a globe in the sky.</p>
+  <figure class="frame film">
+    <video controls playsinline preload="metadata" poster="renders/strip/frame_0001.jpg">
+      <source src="renders/the_last_observatory.mp4" type='video/mp4; codecs="avc1.64001F"'>
+      <source src="renders/the_last_observatory.webm" type='video/webm; codecs="vp9"'>
+      Your browser can't play this video. <a href="renders/the_last_observatory.mp4">Download the MP4</a>.
+    </video>
+  </figure>
+  <div class="strip" aria-label="Key frames of the camera move">
+    <figure><img loading="lazy" src="renders/strip/frame_0001.jpg" alt="Frame 1: over the astronaut's shoulder, the black hole ahead"><span>0.0s</span></figure>
+    <figure><img loading="lazy" src="renders/strip/frame_0036.jpg" alt="Frame 36: the camera begins to pull back"><span>1.5s</span></figure>
+    <figure><img loading="lazy" src="renders/strip/frame_0060.jpg" alt="Frame 60: the astronaut on the curved horizon"><span>2.5s</span></figure>
+    <figure><img loading="lazy" src="renders/strip/frame_0084.jpg" alt="Frame 84: the observatory and path lights revealed"><span>3.5s</span></figure>
+    <figure><img loading="lazy" src="renders/strip/frame_0108.jpg" alt="Frame 108: the planet becomes a small globe"><span>4.5s</span></figure>
+    <figure><img loading="lazy" src="renders/strip/frame_0144.jpg" alt="Frame 144: the full scene"><span>6.0s</span></figure>
+  </div>
+</section>
+
+<section>
+  <h2>The still</h2>
+  <p class="kicker">The final frame of the move is also the hero composition. The planet sits low and left, the hole looms upper right,
+    and the astronaut is silhouetted against the white-hot approaching side of the disk.</p>
+  <figure>
+    <a class="frame" href="renders/the_last_observatory_still.png" style="display:block">
+      <img src="renders/the_last_observatory_still.jpg" width="2560" height="1440"
+           alt="A small cratered planet with a domed observatory, radio mast, dish and a lone astronaut, beneath a huge black hole with an orange lensed accretion disk">
+    </a>
+    <figcaption>2560 &times; 1440, Cycles, 384 samples. Click for the lossless PNG.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <div class="physics">
+    <figure class="frame">
+      <img loading="lazy" src="renders/detail_black_hole.jpg" width="880" height="660" alt="Close crop of the black hole: thin photon ring and lensed gas streaks">
+    </figure>
+    <div>
+      <h2>A real black hole, not a painted ring</h2>
+      <p class="kicker" style="margin-bottom:20px">The sky is one OSL shader. It traces every camera ray backwards through the curved spacetime
+        around a non-rotating black hole.</p>
+      <ul>
+        <li><b>Gravitational lensing.</b> Photon paths are integrated with <code>a = &minus;1.5&thinsp;h&sup2;&thinsp;r&#770;&thinsp;/&thinsp;r&#8308;</code>, whose orbits match
+          Schwarzschild null geodesics exactly. The far side of the disk bends over and under the shadow on its own.</li>
+        <li><b>Photon ring and Einstein ring.</b> Higher-order images hug the shadow, and background stars smear into arcs around it.</li>
+        <li><b>Relativistic Doppler beaming.</b> Gas moving towards us is brighter and hotter, which is why one side of the disk burns white.</li>
+        <li><b>Keplerian shear.</b> The inner disk orbits faster than the outer disk (&omega; &prop; r<sup>&minus;3/2</sup>), so the gas visibly winds during the shot.</li>
+        <li><b>Seamless sky.</b> Distant rays use the analytic weak-field deflection of the same force law, so the lensed star field has no join.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Everything is procedural</h2>
+  <p class="kicker">There are no downloaded models or image textures. The scene is generated from Python, and the terrain and rock field stay live,
+    editable Geometry Nodes systems in the <code>.blend</code>.</p>
+  <div class="notes">
+    <article class="note">
+      <h3><i>01</i>The planet</h3>
+      <p>A 9&nbsp;m icosphere displaced by Geometry Nodes: noise undulation, ridged detail and three scales of craters (Voronoi bowls with raised rims).
+        It also has a levelled observatory pad and a smoothed path. The regolith shader darkens crater floors, brightens ejecta and presses boot prints into the dust.</p>
+    </article>
+    <article class="note">
+      <h3><i>02</i>Rocks</h3>
+      <p>Nine rock prototypes from a <code>RockGen</code> node group (noise plus Chebychev-Voronoi facets). They are Poisson-scattered as rocks, boulders
+        and pebbles, with keep-out zones around every structure and path. Dust settles on their upward faces.</p>
+    </article>
+    <article class="note">
+      <h3><i>03</i>The observatory</h3>
+      <p>A panelled drum with seams, rivets, paint chips and creeping dust. It has an open door onto a lit console, glowing portholes, a catwalk,
+        railing and ladder, and a dome whose slit and shutter face the black hole. Inside, a telescope is aimed straight at it under red observing light.</p>
+    </article>
+    <article class="note">
+      <h3><i>04</i>Antenna equipment</h3>
+      <p>A striped lattice radio mast with guy wires, panel antennas and a Yagi aimed at the hole. Its red beacons blink. Nearby are a parabolic dish with feed struts,
+        a solar array, supply crates, path bollards and cables draped over the terrain.</p>
+    </article>
+    <article class="note">
+      <h3><i>05</i>The astronaut</h3>
+      <p>A metaball EVA suit with accordion pleats at the joints. A hard-shell helmet with a gold visor, a backpack, a chest control unit with status LEDs, gloves,
+        boots and a handheld tablet. Ray-casts under each boot seat the figure on the terrain.</p>
+    </article>
+    <article class="note">
+      <h3><i>06</i>Light and grade</h3>
+      <p>A warm key stands in for the inner disk, a cold starlight fill and a cool under-rim keep the night side readable, and warm practicals glow against the dark.
+        The grade is AgX with bloom, subtle lens dispersion, a vignette and a split-tone.</p>
+    </article>
+  </div>
+</section>
+
+<section>
+  <h2>Build it yourself</h2>
+  <p class="kicker">It runs on Blender 5.2, either the app or the <code>bpy</code> module from PyPI. Rendering needs Cycles on CPU with Open Shading Language enabled,
+    which the saved file already has switched on.</p>
+<pre><span class="c"># rebuild the scene from nothing (~10 s)</span>
+python scripts/build_scene.py -- --out the_last_observatory.blend
+
+<span class="c"># the hero still (last frame)</span>
+python scripts/render_still.py -- --res 2560x1440 --spp 384
+
+<span class="c"># the 6 s animation, then an MP4</span>
+python scripts/render_animation.py -- --res 1280x720 --spp 32</pre>
+  <p class="kicker" style="margin-top:18px">Start with <a href="https://github.com/Aherostrial/last-observatory-opus/blob/claude/nice-cray-r2vrzr/shaders/black_hole_sky.osl"><code>shaders/black_hole_sky.osl</code></a>
+    for the black hole and <a href="https://github.com/Aherostrial/last-observatory-opus/blob/claude/nice-cray-r2vrzr/scripts/lastobs/layout.py"><code>scripts/lastobs/layout.py</code></a>
+    for how the layout is derived from the final framing. You can also download the <a href="the_last_observatory.blend">.blend</a>.</p>
+</section>
+
+</main>
+
+<footer>
+  <span>The Last Observatory &middot; rendered in Blender 5.2 Cycles</span>
+  <a href="https://github.com/Aherostrial/last-observatory-opus">github.com/Aherostrial/last-observatory-opus</a>
+</footer>
+
+</body>
+</html>
