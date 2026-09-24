@@ -1,0 +1,305 @@
+// The Last Observatory -- Schwarzschild black hole sky
+// ------------------------------------------------------------------------
+// World (background) shader for Cycles/OSL.
+//
+// Every camera / glossy ray that reaches the sky is traced backwards through
+// the curved spacetime around a non-rotating black hole.  Photon paths are
+// integrated with the classic "pseudo-Newtonian" formulation
+//
+//     a = -1.5 * h^2 * r_vec / |r|^5         (units: Schwarzschild radius = 1)
+//
+// whose orbits reproduce the exact null geodesics of the Schwarzschild metric
+// (h = |r x v| is conserved).  Crossings of the thin accretion disk plane are
+// accumulated front-to-back, so the secondary image (the far side of the
+// disk lensed over and under the shadow) and the photon ring fall out of the
+// physics rather than being painted in.
+//
+// The sky is treated as infinitely distant: camera translation produces no
+// parallax, exactly as for a hole thousands of kilometres across.
+//
+// Rays passing far from the hole use the analytic weak-field deflection of
+// the *same* force law, so the lensed star field is seamless where the
+// integrator hands over to the approximation.
+//
+// Diffuse / shadow rays get a cheap, smooth approximation (ambient + warm
+// lobe) so indirect lighting stays noise free and fast.
+
+
+float fbm(point p, int octaves, float lacunarity)
+{
+    float sum = 0.0;
+    float amp = 0.5;
+    float norm = 0.0;
+    point q = p;
+    for (int i = 0; i < octaves; i++) {
+        sum += amp * noise("perlin", q);
+        norm += amp;
+        q = q * lacunarity + vector(1.37, 7.11, 3.73);
+        amp *= 0.5;
+    }
+    return sum / norm;
+}
+
+// Art-directed temperature ramp, 0 = cool outer gas, 1 = white-hot ISCO.
+color disk_ramp(float t)
+{
+    color c0 = color(0.28, 0.020, 0.003);
+    color c1 = color(0.95, 0.16, 0.020);
+    color c2 = color(1.00, 0.36, 0.060);
+    color c3 = color(1.00, 0.64, 0.280);
+    color c4 = color(1.00, 0.92, 0.820);
+    float x = clamp(t, 0.0, 1.0);
+    if (x < 0.25) return mix(c0, c1, x / 0.25);
+    if (x < 0.50) return mix(c1, c2, (x - 0.25) / 0.25);
+    if (x < 0.78) return mix(c2, c3, (x - 0.50) / 0.28);
+    return mix(c3, c4, (x - 0.78) / 0.22);
+}
+
+color star_color(float h)
+{
+    if (h < 0.18) return color(0.62, 0.74, 1.00);
+    if (h < 0.55) return color(0.92, 0.95, 1.00);
+    if (h < 0.80) return color(1.00, 0.90, 0.72);
+    return color(1.00, 0.66, 0.42);
+}
+
+// Procedural star field on the celestial sphere.
+color starfield(vector d, float gain, float size)
+{
+    color c = 0;
+    for (int L = 0; L < 3; L++) {
+        float scale = 70.0 * pow(2.3, L);
+        point q = point(d * scale) + vector(L * 31.7, L * 11.3, L * 5.9);
+        point cell = floor(q);
+        float h = cellnoise(cell);
+        float thresh = (L == 0) ? 0.955 : ((L == 1) ? 0.915 : 0.87);
+        if (h > thresh) {
+            vector j = vector(cellnoise(cell + vector(3.1, 0, 0)),
+                              cellnoise(cell + vector(0, 5.3, 0)),
+                              cellnoise(cell + vector(0, 0, 7.7)));
+            point sp = cell + vector(0.3) + 0.4 * j;
+            vector sd = normalize(vector(sp - vector(L * 31.7, L * 11.3, L * 5.9)));
+            float ang = length(cross(d, sd));
+            if (dot(d, sd) > 0.0) {
+                float hb = cellnoise(cell + vector(9.9, 1.1, 4.4));
+                float bright = 0.006 + 2.2 * pow(hb, 16.0);
+                bright *= (L == 0) ? 1.4 : ((L == 1) ? 0.55 : 0.28);
+                float sig = size * (0.75 + 0.9 * pow(hb, 4.0));
+                float prof = exp(-(ang * ang) / (2.0 * sig * sig));
+                // faint diffraction-free halo on the brightest stars
+                prof += 0.02 * pow(hb, 8.0) * exp(-ang / (sig * 6.0));
+                float hc = cellnoise(cell + vector(2.2, 8.8, 6.6));
+                c += star_color(hc) * bright * prof;
+            }
+        }
+    }
+    return c * gain;
+}
+
+// Faint galactic band with dust lanes -- keeps the sky from being flat black.
+color galaxy(vector d, vector gal_n, float gain)
+{
+    float lat = dot(d, gal_n);
+    float band = exp(-(lat * lat) / 0.035);
+    float wide = exp(-(lat * lat) / 0.20);
+    point q = point(d * 3.0);
+    float cloud = 0.5 + 0.5 * fbm(q, 5, 2.1);
+    float fine = 0.5 + 0.5 * fbm(q * 4.0 + vector(4.0, 2.0, 9.0), 4, 2.2);
+    float dust = smoothstep(0.45, 0.70, 0.5 + 0.5 * fbm(q * 2.2 + vector(9.0, 1.0, 3.0), 5, 2.0));
+    color warm = color(0.95, 0.62, 0.42);
+    color cool = color(0.30, 0.42, 0.95);
+    color tint = mix(cool, warm, smoothstep(0.3, 0.8, cloud) * band);
+    float lum = band * (0.35 + 0.9 * cloud * fine) * (1.0 - 0.75 * dust) + 0.18 * wide * cloud;
+    return tint * lum * gain;
+}
+
+// Rotate direction v towards the hole by the weak-field deflection that the
+// pseudo-force accumulates from the current point to infinity.
+vector weak_deflect(point p, vector v)
+{
+    vector vh = normalize(v);
+    float along = dot(vector(p), vh);
+    vector c = vector(p) - vh * along;          // closest-approach offset
+    float b = length(c);
+    if (b < 1e-4) return vh;
+    float s = along / length(vector(p));        // sin(theta) at current point
+    float alpha = (1.5 / b) * (2.0 / 3.0 - s + s * s * s / 3.0);
+    alpha = clamp(alpha, 0.0, 1.2);
+    return normalize(vh * cos(alpha) - (c / b) * sin(alpha));
+}
+
+shader black_hole_sky(
+    vector BHDir = vector(0, 1, 0),        // world direction observer -> hole
+    vector DiskNormal = vector(0, 0, 1),   // world normal of the disk plane
+    vector GalaxyNormal = vector(0.3, -0.2, 0.93),
+    float ObsDist = 26.0,                  // observer distance [Rs]
+    float DiskInner = 3.0,                 // ISCO [Rs]
+    float DiskOuter = 11.0,
+    float Time = 0.0,                      // seconds, drives disk rotation
+    float Omega = 0.30,                    // angular speed at ISCO [rad/s]
+    float DiskGain = 6.0,
+    float Doppler = 0.65,                  // 0 = none, 1 = full g^3 beaming
+    float HaloGain = 0.06,
+    float StarGain = 1.0,
+    float StarSize = 0.00055,              // angular sigma [rad]
+    float GalaxyGain = 0.010,
+    color Ambient = color(0.010, 0.013, 0.022),
+    color LobeColor = color(1.0, 0.45, 0.16),
+    float LobeGain = 0.35,
+    int MaxSteps = 700,
+    float StepScale = 0.045,
+    output color Col = 0)
+{
+    vector d = normalize(vector(P));
+    vector B = normalize(BHDir);
+    vector n = normalize(DiskNormal);
+
+    int full = raytype("camera") || raytype("glossy") || raytype("singular");
+    // Pin-point stars in rough reflections are pure variance (denoiser
+    // blotches) and visually meaningless: only camera / mirror rays see them.
+    float star_vis = (raytype("camera") || raytype("singular")) ? 1.0 : 0.0;
+
+    if (!full) {
+        // Cheap, smooth approximation for indirect lighting.
+        float lobe = pow(max(dot(d, B), 0.0), 5.0);
+        Col = Ambient + LobeColor * LobeGain * lobe;
+        return;
+    }
+
+    // Disk basis
+    vector e1 = normalize(cross(n, vector(0.31, 0.27, 0.91)));
+    vector e2 = cross(n, e1);
+
+    // Observer position relative to hole (hole at origin, world orientation)
+    point O = point(-B * ObsDist);
+
+    float tca = dot(vector(-O), d);                // param of closest approach
+    float bstraight = length(cross(vector(O), d)); // straight-line impact param
+    float farR = DiskOuter + 3.0;
+
+    color disk = 0;
+    float A = 0.0;          // accumulated disk opacity
+    color halo = 0;
+    vector dout = d;
+    int captured = 0;
+
+    if (bstraight > farR || (tca < 0.0 && ObsDist > farR)) {
+        // Far field: analytic deflection only.
+        dout = weak_deflect(O, d);
+    }
+    else {
+        point p = O;
+        vector v = d;
+        vector hv = cross(vector(p), v);
+        float h2 = dot(hv, hv);
+
+        // Skip the nearly straight approach: jump to the entry sphere and
+        // apply the analytic deflection accumulated on the way.
+        float Rent = farR + 0.5;
+        if (ObsDist > Rent + 0.5) {
+            float b = bstraight;
+            float tin = tca - sqrt(max(Rent * Rent - b * b, 0.0));
+            point pe = O + d * tin;
+            float s0 = -tca / ObsDist;
+            float s1 = (tin - tca) / Rent;
+            float F0 = s0 - s0 * s0 * s0 / 3.0;
+            float F1 = s1 - s1 * s1 * s1 / 3.0;
+            float alpha = (b > 1e-4) ? (1.5 / b) * (F1 - F0) : 0.0;
+            vector c = vector(O + d * tca);
+            float cl = length(c);
+            if (cl > 1e-4)
+                v = normalize(d * cos(alpha) - (c / cl) * sin(alpha));
+            p = pe;
+            hv = cross(vector(p), v);
+            h2 = dot(hv, hv);
+        }
+
+        for (int i = 0; i < MaxSteps; i++) {
+            float r2 = dot(vector(p), vector(p));
+            float r = sqrt(r2);
+            float vl = length(v);
+            float dt = clamp(StepScale * r, 0.012, 1.6) / vl;
+
+            vector a = -1.5 * h2 * vector(p) / (r2 * r2 * r);
+            point pn = p + v * dt + 0.5 * a * dt * dt;
+            float rn2 = dot(vector(pn), vector(pn));
+            float rn = sqrt(rn2);
+            vector an = -1.5 * h2 * vector(pn) / (rn2 * rn2 * rn);
+            vector vn = v + 0.5 * (a + an) * dt;
+
+            // Soft volumetric glow hugging the photon sphere (lensed too).
+            float seg = length(vector(pn - p));
+            halo += (1.0 - A) * exp(-max(rn - 1.7, 0.0) * 0.8) * smoothstep(1.15, 2.2, rn) * seg * LobeColor;
+
+            // Disk plane crossing
+            float s0 = dot(vector(p), n);
+            float s1 = dot(vector(pn), n);
+            if (s0 * s1 <= 0.0 && s0 != s1) {
+                float f = s0 / (s0 - s1);
+                point ph = p + (pn - p) * f;
+                float rh = length(vector(ph));
+                if (rh > DiskInner * 0.92 && rh < DiskOuter * 1.05) {
+                    float x = dot(vector(ph), e1);
+                    float y = dot(vector(ph), e2);
+                    float phi = atan2(y, x);
+                    // Keplerian differential rotation
+                    float om = Omega * pow(DiskInner / rh, 1.5);
+                    float pr = phi - om * Time;
+                    float cr = cos(pr), sr = sin(pr);
+
+                    // Radial envelope: razor inner edge, feathered outer rim
+                    float env = smoothstep(DiskInner * 0.94, DiskInner * 1.06, rh) *
+                                (1.0 - smoothstep(DiskOuter * 0.45, DiskOuter, rh));
+
+                    // Streaky gas: noise stretched along the orbit
+                    point q1 = point(rh * 2.6, cr * 2.2, sr * 2.2);
+                    point q2 = point(rh * 7.5, cr * 5.0, sr * 5.0) + vector(5.0, 1.0, 2.0);
+                    float n1 = 0.5 + 0.5 * fbm(q1, 4, 2.15);
+                    float n2 = 0.5 + 0.5 * fbm(q2, 3, 2.3);
+                    float rings = 0.5 + 0.5 * sin(rh * 9.0 + 3.0 * n1);
+                    float clump = smoothstep(0.30, 0.78, n1);
+                    float dens = env * clamp(0.08 + 1.25 * clump * (0.45 + 0.55 * n2) + 0.10 * rings, 0.0, 1.4);
+
+                    // Temperature (art directed, hottest at ISCO)
+                    float t = pow(DiskInner / rh, 0.95);
+
+                    // Relativistic Doppler + gravitational shift
+                    vector tdir = normalize(cross(n, vector(ph)));
+                    float beta = clamp(sqrt(0.5 / max(rh - 1.0, 0.05)), 0.0, 0.95);
+                    float gam = 1.0 / sqrt(1.0 - beta * beta);
+                    vector emit_dir = -normalize(vn);    // towards observer
+                    float delta = 1.0 / (gam * (1.0 - beta * dot(tdir, emit_dir)));
+                    float g = delta * sqrt(max(1.0 - 1.0 / rh, 0.0));
+                    float gd = mix(1.0, g, Doppler);
+
+                    float teff = clamp(pow(t, 1.3) * pow(gd, 1.1) * (0.8 + 0.35 * n2), 0.0, 1.2);
+                    float I = pow(t, 2.2) * pow(gd, 3.0) * (0.35 + 0.9 * dens);
+
+                    float alpha = clamp(dens * 0.95, 0.0, 0.97);
+                    disk += (1.0 - A) * alpha * disk_ramp(teff) * I;
+                    A += (1.0 - A) * alpha;
+                }
+            }
+
+            p = pn;
+            v = vn;
+
+            if (rn < 1.0) { captured = 1; break; }
+            if (A > 0.995) break;
+            if (rn > DiskOuter * 1.15 && dot(vector(p), v) > 0.0) {
+                dout = weak_deflect(p, v);
+                break;
+            }
+        }
+        if (!captured) {
+            float rr = length(vector(p));
+            if (rr <= DiskOuter * 1.15) dout = normalize(v);
+        }
+    }
+
+    color sky = 0;
+    if (!captured) {
+        sky = starfield(dout, StarGain * star_vis, StarSize) + galaxy(dout, normalize(GalaxyNormal), GalaxyGain);
+    }
+    Col = disk * DiskGain + halo * HaloGain + sky * (1.0 - A);
+}
